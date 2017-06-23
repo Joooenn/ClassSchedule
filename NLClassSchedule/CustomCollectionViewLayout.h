@@ -8,14 +8,10 @@
 
 #import <UIKit/UIKit.h>
 
-// NOTE: This class is not used in this project - actually it is removed from the target. I added it just in case you need to compare the code between Objective-C and Swift
-typedef NS_ENUM(NSUInteger, CustomScrollDirection) {
-    CustomScrollDirectionVertical = 0,
-    CustomScrollDirectionHorizontal
-};
-
-
 @interface CustomCollectionViewLayout : UICollectionViewLayout
+// 被选中列
 @property (nonatomic, assign) IBInspectable NSInteger extendIndex;
+// 预设每个section有多少item
 @property (nonatomic, assign) IBInspectable NSInteger rows;
 @end
+

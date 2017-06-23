@@ -19,39 +19,26 @@
 
 - (void)prepareLayout {
     
+    [self clearLayoutArray];
+    [self calculateItemsSize];
+    [self updateItemsAttributes];
+}
+
+#pragma mark - Private
+
+- (void)clearLayoutArray {
+    self.itemAttributes = [@[] mutableCopy];
+    self.itemsSize = [@[] mutableCopy];
+}
+
+- (void)updateItemsAttributes {
+    
     NSUInteger column = 0;
     CGFloat xOffset = 0.0;
     CGFloat yOffset = 0.0;
     CGFloat contentWidth = 0.0;
     CGFloat contentHeight = 0.0;
     
-    if (self.itemAttributes.count > 0) {
-        for (int section = 0; section < [self.collectionView numberOfSections]; section++) {
-            NSUInteger numberOfItems = [self.collectionView numberOfItemsInSection:section];
-            for (NSUInteger index = 0; index < numberOfItems; index++) {
-                if (section != 0 && index != 0) {
-                    continue;
-                }
-                UICollectionViewLayoutAttributes *attributes = [self layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForItem:index inSection:section]];
-                if (section == 0) {
-                    CGRect frame = attributes.frame;
-                    frame.origin.y = self.collectionView.contentOffset.y;
-                    attributes.frame = frame;
-                }
-                if (index == 0) {
-                    CGRect frame = attributes.frame;
-                    frame.origin.x = self.collectionView.contentOffset.x;
-                    attributes.frame = frame;
-                }
-            }
-        }
-    }
-    
-    self.itemAttributes = [@[] mutableCopy];
-    self.itemsSize = [@[] mutableCopy];
-    
-    [self calculateItemsSize];
-
     for (int section = 0; section < [self.collectionView numberOfSections]; section++) {
         NSMutableArray *sectionAttributes = [@[] mutableCopy];
         for (NSUInteger index = 0; index < self.rows; index++) {
@@ -66,23 +53,22 @@
             } else if (section == 0 || index == 0) {
                 attributes.zIndex = 1023;
             }
+            
             if (section == 0) {
                 CGRect frame = attributes.frame;
                 frame.origin.x = self.collectionView.contentOffset.x;
-//                    frame.origin.y = self.collectionView.contentOffset.y;
                 attributes.frame = frame;
             }
             if (index == 0) {
                 CGRect frame = attributes.frame;
                 frame.origin.y = self.collectionView.contentOffset.y;
-//                    frame.origin.x = self.collectionView.contentOffset.x;
                 attributes.frame = frame;
             }
             
             [sectionAttributes addObject:attributes];
-
+            
+            
             yOffset = yOffset+itemSize.height;
-//                xOffset = xOffset+itemSize.width;
             column++;
             
             // Create a new row if this was the last column
@@ -91,68 +77,39 @@
                 if (yOffset > contentHeight) {
                     contentHeight = yOffset;
                 }
-//                    if (xOffset > contentWidth) {
-//                        contentWidth = xOffset;
-//                    }
-                
                 
                 // Reset values
                 column = 0;
-
+                
                 xOffset += itemSize.width;
                 yOffset = 0;
-//                    xOffset = 0;
-//                    yOffset += itemSize.height;
             }
         }
         [self.itemAttributes addObject:sectionAttributes];
     }
     
     UICollectionViewLayoutAttributes *attributes = [[self.itemAttributes lastObject] lastObject];
-    contentWidth = attributes.frame.origin.x+attributes.frame.size.width;
-//    contentHeight = attributes.frame.origin.y+attributes.frame.size.height;
+    contentWidth = attributes.frame.origin.x + attributes.frame.size.width;
     self.contentSize = CGSizeMake(contentWidth, contentHeight);
 }
 
-- (CGSize)collectionViewContentSize {
-    return self.contentSize;
-}
-
-- (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath {
-    return self.itemAttributes[indexPath.section][indexPath.row];
-}
-
-- (NSArray *)layoutAttributesForElementsInRect:(CGRect)rect {
-    NSMutableArray *attributes = [@[] mutableCopy];
-    for (NSArray *section in self.itemAttributes) {
-        [attributes addObjectsFromArray:[section filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(UICollectionViewLayoutAttributes *evaluatedObject, NSDictionary *bindings) {
-            return CGRectIntersectsRect(rect, [evaluatedObject frame]);
-        }]]];
-    }
-    
-    return attributes;
-}
-
-- (BOOL)shouldInvalidateLayoutForBoundsChange:(CGRect)newBounds {
-    return YES; // Set this to YES to call prepareLayout on every scroll
-}
-
+// 获取对应indexPath的itemSize
+static CGFloat const extendWidth = 100.0;
 - (CGSize)sizeForItemWithColumnIndexPath:(NSIndexPath *)indexPath {
-    CGSize size = CGSizeMake(60, 100);
-    if (indexPath.section == 0) {
-        size.width = 40;
-    }
-    if (indexPath.item == 0) {
-        size.height = 50;
-    }
-    if (indexPath.section == self.extendIndex && indexPath.section) {
-        size.width = 100;
-    }
+    CGSize size = CGSizeMake(60, 100);//预设cell的size
+    //根据表格的特性，调整不同情况下cell的宽高
+    size.width = indexPath.section ? size.width : 40;
+    size.height = indexPath.item ? size.height : 50;
+    size.width = (indexPath.section == self.extendIndex && indexPath.section > 0) ? extendWidth : size.width;
     return size;
-    
 }
 
+// 计算得到表格视图itemSize的集合
 - (void)calculateItemsSize {
+    if (self.itemsSize.count > 0) {
+        return;
+    }
+    
     NSMutableArray *sectionArray = [@[] mutableCopy];
     for (NSInteger section = 0; section < [self.collectionView numberOfSections]; section ++) {
         NSMutableArray *itemArray = [@[] mutableCopy];
@@ -169,4 +126,29 @@
     self.itemsSize = sectionArray;
 }
 
+#pragma mark - Overwrite
+//返回collectionView的内容的尺寸
+- (CGSize)collectionViewContentSize {
+    return self.contentSize;
+}
+// 返回对应于indexPath的位置的cell的布局属性
+- (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath {
+    return self.itemAttributes[indexPath.section][indexPath.row];
+}
+// 返回rect中的所有的元素的布局属性
+- (NSArray *)layoutAttributesForElementsInRect:(CGRect)rect {
+    NSMutableArray *attributes = [@[] mutableCopy];
+    for (NSArray *section in self.itemAttributes) {
+        [attributes addObjectsFromArray:[section filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(UICollectionViewLayoutAttributes *evaluatedObject, NSDictionary *bindings) {
+            return CGRectIntersectsRect(rect, [evaluatedObject frame]);
+        }]]];
+    }
+    return attributes;
+}
+// 当边界发生改变时，是否应该刷新布局
+- (BOOL)shouldInvalidateLayoutForBoundsChange:(CGRect)newBounds {
+    return YES; // 在边界变化（一般是scroll到其他地方）时，将重新计算需要的布局信息
+}
+
 @end
+
